@@ -15,7 +15,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const salt = bcrypt.genSaltSync(10);
-const secret = 'ndjoqu3nkfjofgg';
+const secret = process.env.SECRET;
 
 app.use(cors({credentials: true, origin:process.env.CORS_URL}));
 app.use(express.json());
