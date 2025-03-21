@@ -13,16 +13,16 @@ const Post = require('./models/Post.js');
 const path = require('path');
 const dotenv = require('dotenv');
 dotenv.config();
+const {upload} = require("./cloudinaryConfig");
 
 const salt = bcrypt.genSaltSync(10);
 const secret = process.env.SECRET;
 
+mongoose.connect(process.env.MONGO_URL);
+
 app.use(cors({credentials: true, origin:process.env.CORS_URL}));
 app.use(express.json());
 app.use(cookieParser());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-mongoose.connect(process.env.MONGO_URL);
 
 app.post('/register', async(req,res)=>{
     const {username, password} =req.body;
@@ -63,70 +63,88 @@ app.post('/logout', (req,res)=>{
     res.cookie('token', '').json('ok');
 })
 
-app.post('/post', uploadMiddleware.single('file'), async(req,res)=>{
-    const {originalname, path} = req.file;
-    const parts = originalname.split('.');
-    const ext = parts[parts.length-1];
-    const newPath = path+'.'+ext;
-    fs.renameSync(path, newPath);
-    const {token} = req.cookies;
-    jwt.verify(token, secret, {}, async(err,info)=>{
-        const {title, summary, content} = req.body;
+app.post("/post", upload.single("file"), async (req, res) => {
+    try {
+      const { title, summary, content } = req.body;
+      const { token } = req.cookies;
+      jwt.verify(token, secret, {}, async (err, info) => {
+        if (err) return res.status(401).json({ error: "Unauthorized" });
+        const coverUrl = req.file ? req.file.path : null; 
         const postDoc = await Post.create({
-            title,
-            summary,
-            content,
-            cover: newPath,
-            author: info.id,
+          title,
+          summary,
+          content,
+          cover: coverUrl, 
+          author: info.id,
         });
         res.json(postDoc);
-    })
-})
-
-app.put('/post', uploadMiddleware.single('file'), async(req,res)=>{
-    let newPath = null;
-    if(req.file){
-        const {originalname, path} = req.file;
-        const parts = originalname.split('.');
-        const ext = parts[parts.length-1];
-        const newPath = path+'.'+ext;
-        fs.renameSync(path, newPath);
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
     }
-    
-    const {token} = req.cookies;
-    jwt.verify(token, secret, {}, async(err,info)=>{
-        if(err) throw err;
-        const {id,title, summary, content} = req.body;
+});
+
+app.put("/post", upload.single("file"), async (req, res) => {
+    try {
+      let newCoverUrl = null;
+      if (req.file) {
+        newCoverUrl = req.file.path; 
+      }
+      const { token } = req.cookies;
+      jwt.verify(token, secret, {}, async (err, info) => {
+        if (err) return res.status(401).json({ error: "Unauthorized" });
+        const { id, title, summary, content } = req.body;
         const postDoc = await Post.findById(id);
-        const isAuthor = JSON.stringify(postDoc.author)===JSON.stringify(info.id);
-        if(!isAuthor){
-            return res.status(400).json('you are not the author');
+        if (!postDoc) return res.status(404).json({ error: "Post not found" });
+        if (JSON.stringify(postDoc.author) !== JSON.stringify(info.id)) {
+          return res.status(403).json({ error: "You are not the author" });
         }
         postDoc.title = title;
         postDoc.summary = summary;
         postDoc.content = content;
-        postDoc.cover = newPath ? newPath : postDoc.cover;
-
+        if (newCoverUrl) postDoc.cover = newCoverUrl; 
         await postDoc.save();
-
         res.json(postDoc);
-    })
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
 })
 
-app.get('/post', async (req,res)=>{
-    res.json(await Post.find()
-                .populate('author', ['username'])
-                .sort({createdAt: -1})
-                .limit(20)
-    );
-})
+app.get('/post', async (req, res) => {
+    try {
+        const posts = await Post.find()
+            .populate('author', ['username'])
+            .sort({ createdAt: -1 })
+            .limit(20);
 
-app.get('/post/:id', async(req,res)=>{
-    const {id} = req.params;
-    const postDoc = await Post.findById(id)
-                    .populate('author', ['username']);
-    res.json(postDoc);
-})
+        const formattedPosts = posts.map(post => ({
+            _id: post._id,
+            title: post.title,
+            summary: post.summary,
+            content: post.content,
+            cover: post.cover, 
+            author: post.author,
+            createdAt: post.createdAt
+        }));
+        res.json(formattedPosts);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get("/post/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const postDoc = await Post.findById(id).populate("author", ["username"]);
+      if (!postDoc) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+      res.json(postDoc);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });  
 
 app.listen(4000, ()=>{
     console.log("app is listening");

@@ -27,7 +27,7 @@ export default function PostPage(){
                 </div>
             )}
             <div className="image">
-                <img src={import.meta.env.VITE_API_URL+`/${postInfo.cover}`} alt=""/>
+                <img src={`${postInfo.cover}`} alt=""/>
             </div>
             <div dangerouslySetInnerHTML={{__html:postInfo.content}}/>
         </div>

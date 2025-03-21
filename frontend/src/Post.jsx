@@ -6,7 +6,7 @@ export default function Post({_id,title, summary, cover, content, createdAt, aut
         <div className="post container">
             <div className="image">
                 <Link to={`/post/${_id}`}>
-                <img src={import.meta.env.VITE_API_URL+'/'+cover}></img>
+                <img src={cover}></img>
                 </Link>
             </div>
             <div className="texts">
