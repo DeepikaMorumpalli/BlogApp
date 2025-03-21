@@ -1,9 +1,11 @@
 import { useState } from "react"
 import TextField from '@mui/material/TextField';
+import { Navigate } from "react-router-dom";
 
 export default function RegisterPage(){
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [redirect, setRedirect] = useState(false);
 
     async function register(e){
         e.preventDefault();
@@ -13,10 +15,14 @@ export default function RegisterPage(){
             headers: {'Content-type': 'application/json'},
         });
         if(response.status ===200){
+            setRedirect(true);
             alert('registration successful');
         }else{
             alert('registration failed');
         }
+    }
+    if(redirect){
+        return <Navigate to={'/'} /> 
     }
 
     return(
